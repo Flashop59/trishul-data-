@@ -43,7 +43,10 @@ if uploaded_file is not None:
         bins = list(range(0, 140, 10)) + [float("inf")]
         labels = [f"{i}-{i+10}" for i in range(0, 130, 10)] + ["130+"]
 
+        # Assign bin labels
         df["current_in_class"] = pd.cut(df["current_in"], bins=bins, labels=labels, right=False)
+
+        # Distribution percentage
         distribution = df["current_in_class"].value_counts(normalize=True).sort_index() * 100
 
         fig2, ax2 = plt.subplots()
@@ -53,5 +56,13 @@ if uploaded_file is not None:
         ax2.set_title("Current_in Distribution by Class (10A Intervals)")
         plt.xticks(rotation=45)
         st.pyplot(fig2)
+
+        # Runtime Summary Table
+        st.subheader("⏱️ Runtime Summary by Current Range")
+        sample_interval_sec = 1 / 22  # each row = 1/22 sec
+        runtime_stats = df["current_in_class"].value_counts().sort_index().reset_index()
+        runtime_stats.columns = ["Current Range (A)", "Row Count"]
+        runtime_stats["Total Time (sec)"] = runtime_stats["Row Count"] * sample_interval_sec
+        st.table(runtime_stats)
     else:
         st.warning("`current_in` column not found.")
