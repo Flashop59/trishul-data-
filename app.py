@@ -20,7 +20,6 @@ if uploaded_file is not None:
     # --- Excel Handling ---
     elif file_name.endswith(".xlsx"):
         try:
-            # Load Excel file (get available sheets)
             xls = pd.ExcelFile(uploaded_file)
             sheet_name = st.selectbox("Select Sheet", xls.sheet_names)
             df = pd.read_excel(uploaded_file, sheet_name=sheet_name)
@@ -60,33 +59,36 @@ if uploaded_file is not None:
 
     st.pyplot(fig)
 
-    # ---- Distribution of current_in ----
-    st.subheader("📈 Distribution of `current_in`")
-    if "current_in" in df.columns:
-        # Binning current_in
+    # ---- Customizable Distribution Section ----
+    st.subheader("📈 Distribution Analysis")
+    if numeric_cols:
+        dist_col = st.selectbox("Select Column for Distribution (Numeric)", numeric_cols, index=0)
+
+        # Binning (10-unit intervals + last bin)
         bins = list(range(0, 140, 10)) + [float("inf")]
         labels = [f"{i}-{i+10}" for i in range(0, 130, 10)] + ["130+"]
 
-        df["current_in_class"] = pd.cut(df["current_in"], bins=bins, labels=labels, right=False)
+        # Assign bin labels
+        df[f"{dist_col}_class"] = pd.cut(df[dist_col], bins=bins, labels=labels, right=False)
 
         # Percentage distribution
-        distribution = df["current_in_class"].value_counts(normalize=True).sort_index() * 100
+        distribution = df[f"{dist_col}_class"].value_counts(normalize=True).sort_index() * 100
 
         # Plot distribution
         fig2, ax2 = plt.subplots()
         ax2.bar(distribution.index.astype(str), distribution.values, color="skyblue")
         ax2.set_ylabel("Percentage (%)")
-        ax2.set_xlabel("Current_in Range (A)")
-        ax2.set_title("Current_in Distribution by Class (10A Intervals)")
+        ax2.set_xlabel(f"{dist_col} Range")
+        ax2.set_title(f"{dist_col} Distribution by Class (10-unit Intervals)")
         plt.xticks(rotation=45)
         st.pyplot(fig2)
 
         # Runtime summary
-        st.subheader("⏱️ Runtime Summary by Current Range")
+        st.subheader("⏱️ Runtime Summary by Range")
         sample_interval_sec = 1 / 22  # each row = 1/22 sec
-        runtime_stats = df["current_in_class"].value_counts().sort_index().reset_index()
-        runtime_stats.columns = ["Current Range (A)", "Row Count"]
+        runtime_stats = df[f"{dist_col}_class"].value_counts().sort_index().reset_index()
+        runtime_stats.columns = [f"{dist_col} Range", "Row Count"]
         runtime_stats["Total Time (sec)"] = runtime_stats["Row Count"] * sample_interval_sec
         st.table(runtime_stats)
     else:
-        st.warning("`current_in` column not found.")
+        st.warning("No numeric columns found for distribution analysis.")
