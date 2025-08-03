@@ -5,27 +5,41 @@ import matplotlib.pyplot as plt
 st.set_page_config(layout="wide")
 st.title("Data Visualizer for EV Telemetry (CSV / Excel)")
 
-# File upload (CSV and Excel)
+# ---- File Upload ----
 uploaded_file = st.file_uploader("Upload CSV or Excel File", type=["csv", "xlsx"])
 
 if uploaded_file is not None:
-    # Detect file type and load accordingly
-    if uploaded_file.name.endswith(".csv"):
-        df = pd.read_csv(uploaded_file, delimiter=';')  # fallback delimiter
-    else:
-        df = pd.read_excel(uploaded_file)
+    # Detect file type
+    file_name = uploaded_file.name.lower()
 
-    # Show raw data
+    # --- CSV Handling ---
+    if file_name.endswith(".csv"):
+        delimiter = st.selectbox("Select CSV Delimiter", [",", ";", "\t"], index=1)
+        df = pd.read_csv(uploaded_file, delimiter=delimiter)
+
+    # --- Excel Handling ---
+    elif file_name.endswith(".xlsx"):
+        try:
+            # Load Excel file (get available sheets)
+            xls = pd.ExcelFile(uploaded_file)
+            sheet_name = st.selectbox("Select Sheet", xls.sheet_names)
+            df = pd.read_excel(uploaded_file, sheet_name=sheet_name)
+        except ImportError:
+            st.error("Excel support requires `openpyxl`. Please install it using:\n\n`pip install openpyxl`")
+            st.stop()
+
+    # ---- Display Data ----
     st.subheader("📋 Filterable Data Table")
     st.dataframe(df)
 
-    # --- Column Type Filtering ---
+    # ---- Column Selection ----
     numeric_cols = df.select_dtypes(include=["number"]).columns.tolist()
     all_cols = df.columns.tolist()
 
-    # --- Custom Graph Section ---
+    # ---- Custom Graph Section ----
     st.subheader("📊 Custom Graphs")
     col1, col2, col3 = st.columns(3)
+
     with col1:
         x_axis = st.selectbox("Select X-axis (Any Column)", all_cols)
     with col2:
@@ -33,7 +47,7 @@ if uploaded_file is not None:
     with col3:
         y2_axis = st.selectbox("Select Secondary Y-axis (optional)", ["None"] + numeric_cols)
 
-    # Plot primary and optional secondary axis
+    # Plot line graph
     fig, ax1 = plt.subplots()
     ax1.set_xlabel(x_axis)
     ax1.set_ylabel(y1_axis, color="blue")
@@ -46,17 +60,16 @@ if uploaded_file is not None:
 
     st.pyplot(fig)
 
-    # --- Distribution Analysis for current_in ---
+    # ---- Distribution of current_in ----
     st.subheader("📈 Distribution of `current_in`")
     if "current_in" in df.columns:
-        # Define bins (10A intervals + 130+)
+        # Binning current_in
         bins = list(range(0, 140, 10)) + [float("inf")]
         labels = [f"{i}-{i+10}" for i in range(0, 130, 10)] + ["130+"]
 
-        # Assign bin labels
         df["current_in_class"] = pd.cut(df["current_in"], bins=bins, labels=labels, right=False)
 
-        # Distribution percentage
+        # Percentage distribution
         distribution = df["current_in_class"].value_counts(normalize=True).sort_index() * 100
 
         # Plot distribution
@@ -68,7 +81,7 @@ if uploaded_file is not None:
         plt.xticks(rotation=45)
         st.pyplot(fig2)
 
-        # Runtime Summary
+        # Runtime summary
         st.subheader("⏱️ Runtime Summary by Current Range")
         sample_interval_sec = 1 / 22  # each row = 1/22 sec
         runtime_stats = df["current_in_class"].value_counts().sort_index().reset_index()
